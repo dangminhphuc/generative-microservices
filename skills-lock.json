@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "java-fundamentals": {
+      "source": "pluginagentmarketplace/custom-plugin-java",
+      "sourceType": "github",
+      "computedHash": "b817b238a8d2b4e55523df667fcdc66e36c9c4c43257eaf423b0d0f083088225"
+    },
+    "microservices-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "ad3f082b4d343294249d4407f1019d98004d659c5d1b4a1bd5feb5ee0378589e"
+    }
+  }
+}
