@@ -5,6 +5,11 @@ spring:
   application:
     name: discovery-server
 
+app:
+  security:
+    username: ${EUREKA_USERNAME:eureka}
+    password: ${EUREKA_PASSWORD:password}
+
 eureka:
   instance:
     hostname: localhost
