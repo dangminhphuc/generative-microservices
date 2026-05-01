@@ -1,0 +1,13 @@
+eureka:
+  instance:
+    hostname: ${EUREKA_INSTANCE_HOSTNAME}
+    prefer-ip-address: false
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${EUREKA_PEER_URLS}
+  server:
+    enable-self-preservation: true
+    renewal-percent-threshold: 0.85
+    eviction-interval-timer-in-ms: 30000
