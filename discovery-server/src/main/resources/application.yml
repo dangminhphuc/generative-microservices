@@ -1,20 +1,28 @@
 server:
   port: 8761
+  shutdown: graceful
 
 spring:
   application:
     name: discovery-server
+  profiles:
+    default: dev
 
 app:
   security:
     username: ${EUREKA_USERNAME:eureka}
     password: ${EUREKA_PASSWORD:password}
 
-eureka:
-  instance:
-    hostname: localhost
-  client:
-    register-with-eureka: false
-    fetch-registry: false
-    service-url:
-      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: discovery-server
+
+logging:
+  level:
+    org.springframework.web: WARN
+    com.netflix: WARN
