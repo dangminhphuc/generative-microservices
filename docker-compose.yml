@@ -59,8 +59,21 @@ services:
     image: prom/prometheus:v2.53.0
     ports:
       - "9090:9090"
+    environment:
+      EUREKA_USERNAME: ${EUREKA_USERNAME:-eureka}
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?EUREKA_PASSWORD must be set}
     volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infra/prometheus/prometheus.yml.template:/etc/prometheus/prometheus.yml.template:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        envsubst < /etc/prometheus/prometheus.yml.template > /etc/prometheus/prometheus.yml
+        exec /bin/prometheus \
+          --config.file=/etc/prometheus/prometheus.yml \
+          --storage.tsdb.path=/prometheus \
+          --web.console.libraries=/usr/share/prometheus/console_libraries \
+          --web.console.templates=/usr/share/prometheus/consoles
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -82,9 +95,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_INSTANCE_HOSTNAME: discovery-server-1
-      EUREKA_USERNAME: eureka
-      EUREKA_PASSWORD: password
-      EUREKA_PEER_URLS: http://eureka:password@discovery-server-2:8761/eureka/
+      EUREKA_USERNAME: ${EUREKA_USERNAME:-eureka}
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?EUREKA_PASSWORD must be set}
+      EUREKA_PEER_URLS: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
       interval: 30s
@@ -101,9 +114,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       EUREKA_INSTANCE_HOSTNAME: discovery-server-2
-      EUREKA_USERNAME: eureka
-      EUREKA_PASSWORD: password
-      EUREKA_PEER_URLS: http://eureka:password@discovery-server-1:8761/eureka/
+      EUREKA_USERNAME: ${EUREKA_USERNAME:-eureka}
+      EUREKA_PASSWORD: ${EUREKA_PASSWORD:?EUREKA_PASSWORD must be set}
+      EUREKA_PEER_URLS: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
       interval: 30s
@@ -123,7 +136,7 @@ services:
       discovery-server-2:
         condition: service_healthy
     environment:
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server-1:8761/eureka/,http://eureka:password@discovery-server-2:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
 
   account-service:
     build:
@@ -145,8 +158,8 @@ services:
       SPRING_DATASOURCE_USERNAME: account_user
       SPRING_DATASOURCE_PASSWORD: account_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server-1:8761/eureka/,http://eureka:password@discovery-server-2:8761/eureka/
-      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:change-me-in-production}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-in-production}
 
   transfer-service:
     build:
@@ -170,7 +183,7 @@ services:
       SPRING_DATASOURCE_USERNAME: transfer_user
       SPRING_DATASOURCE_PASSWORD: transfer_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server-1:8761/eureka/,http://eureka:password@discovery-server-2:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
 
   transaction-history-service:
     build:
@@ -192,7 +205,7 @@ services:
       SPRING_DATASOURCE_USERNAME: history_user
       SPRING_DATASOURCE_PASSWORD: history_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server-1:8761/eureka/,http://eureka:password@discovery-server-2:8761/eureka/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
 
 volumes:
   account-db-data:
