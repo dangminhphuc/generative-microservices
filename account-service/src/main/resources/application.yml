@@ -47,6 +47,12 @@ jwt:
   access-token-expiry: 900000
   refresh-token-expiry: 604800000
 
+# Secret used to authenticate service-to-service calls to /internal/** endpoints.
+# Must be set via INTERNAL_API_SECRET environment variable on all environments.
+internal:
+  api:
+    secret: ${INTERNAL_API_SECRET:dev-internal-secret-for-local-only}
+
 management:
   endpoints:
     web:

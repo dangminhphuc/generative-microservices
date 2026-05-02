@@ -146,6 +146,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: account_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:password@discovery-server-1:8761/eureka/,http://eureka:password@discovery-server-2:8761/eureka/
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:change-me-in-production}
 
   transfer-service:
     build:

@@ -18,7 +18,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/internal/**").permitAll()
+                        // /internal/** is NOT permitted here — protected by InternalAuthFilter (X-Internal-Secret header)
                         .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 );
