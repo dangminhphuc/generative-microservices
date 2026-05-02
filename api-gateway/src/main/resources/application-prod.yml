@@ -1,9 +1,21 @@
+# Production profile — loaded when SPRING_PROFILES_ACTIVE=prod
+#
+# IMPORTANT: jwt.secret has NO default fallback here.
+# If JWT_SECRET is not set, Spring will fail to bind the property and the
+# application will refuse to start. This is intentional fail-fast behaviour.
+# JwtSecretValidator provides an additional guard against the default value.
+
+jwt:
+  secret: ${JWT_SECRET}
+
 eureka:
   instance:
-    hostname: ${EUREKA_INSTANCE_HOSTNAME}
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:api-gateway}
     prefer-ip-address: false
   client:
     service-url:
-      # Point to multiple Eureka peers for HA. Example:
-      # defaultZone: http://user:pass@eureka1:8761/eureka/,http://user:pass@eureka2:8761/eureka/
       defaultZone: ${EUREKA_DEFAULT_ZONE}
+
+gateway:
+  cors:
+    allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS}
