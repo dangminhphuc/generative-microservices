@@ -12,7 +12,7 @@
 
     <artifactId>api-gateway</artifactId>
     <name>API Gateway</name>
-    <description>Spring Cloud Gateway — routing, JWT validation, rate limiting</description>
+    <description>Spring Cloud Gateway — routing, JWT validation, CORS</description>
 
     <dependencies>
         <dependency>
