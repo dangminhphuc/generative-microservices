@@ -33,14 +33,12 @@ class BugConditionExplorationTest {
     // -------------------------------------------------------------------------
 
     /**
-     * Bug Condition: testClassExists("ApiGatewayApplicationTests") = FALSE
+     * Fix Checking: testClassExists("ApiGatewayApplicationTests") = TRUE
      *
-     * Counterexample: "Không có integration test nào xác nhận context load,
-     * health endpoint, JWT filter"
+     * Bug was: no integration test class existed.
+     * Fix applied (task 3): ApiGatewayApplicationTests.java now exists.
      *
-     * EXPECTED OUTCOME: This assertion PASSES (confirms the bug condition holds).
-     * When the fix is applied (task 3), ApiGatewayApplicationTests.java will exist
-     * and this assertion will FAIL — indicating the bug is resolved.
+     * EXPECTED OUTCOME: This assertion PASSES (confirms the fix is in place).
      */
     @Test
     void isBugCondition_NoTest_integrationTestClassDoesNotExist() {
@@ -50,15 +48,15 @@ class BugConditionExplorationTest {
 
         boolean testClassExists = Files.exists(integrationTestFile);
 
-        // Bug condition: file must NOT exist
+        // Fix applied: file MUST now exist
         assertThat(testClassExists)
-                .as("BUG CONDITION (Issue 1): ApiGatewayApplicationTests.java should NOT exist on unfixed code. " +
-                    "Counterexample: no test confirms context load, /actuator/health, JWT filter, or public path bypass.")
-                .isFalse();
+                .as("FIX APPLIED (Issue 1): ApiGatewayApplicationTests.java must exist after fix. " +
+                    "Fix: integration test class created with 4 test methods.")
+                .isTrue();
 
-        // Log counterexample
-        System.out.println("[COUNTEREXAMPLE Issue 1] testClassExists(\"ApiGatewayApplicationTests\") = FALSE");
-        System.out.println("  → No integration test confirms: context load, health endpoint, JWT filter, public path");
+        // Log fix confirmation
+        System.out.println("[FIX CONFIRMED Issue 1] testClassExists(\"ApiGatewayApplicationTests\") = TRUE");
+        System.out.println("  → Integration test confirms: context load, health endpoint, JWT filter, public path");
     }
 
     // -------------------------------------------------------------------------
@@ -66,45 +64,40 @@ class BugConditionExplorationTest {
     // -------------------------------------------------------------------------
 
     /**
-     * Bug Condition: path MATCHES "^/([^/]+/)?internal(/.*)?$" AND gateway does NOT block it.
+     * Fix Checking: blocking route for internal paths now exists in application.yml.
      *
-     * Static verification: application.yml has NO route with predicate matching /internal/**
-     * before the discovery locator routes. The discovery locator is enabled, which means
-     * /account-service/internal/** is automatically forwarded to account-service.
+     * Bug was: no blocking route existed, discovery locator forwarded /internal/** to downstream.
+     * Fix applied (task 4): block-internal-endpoints route added with SetStatus=404, order=-100.
      *
-     * Counterexample: "GET /account-service/internal/accounts không bị block bởi gateway"
-     *
-     * EXPECTED OUTCOME: This assertion PASSES (confirms the bug condition holds).
-     * When the fix is applied (task 4), a blocking route will exist and this assertion will FAIL.
+     * EXPECTED OUTCOME: This assertion PASSES (confirms the fix is in place).
      */
     @Test
     void isBugCondition_InternalExposed_noBlockingRouteInApplicationYml() throws Exception {
         Path applicationYml = Paths.get("src/main/resources/application.yml");
         String yamlContent = Files.readString(applicationYml);
 
-        // The internal-blocking route must NOT exist in unfixed code
+        // Fix applied: blocking route MUST now exist
         boolean hasBlockingRoute = yamlContent.contains("block-internal-endpoints")
                 || (yamlContent.contains("/internal/**") && yamlContent.contains("SetStatus=404"));
 
         assertThat(hasBlockingRoute)
-                .as("BUG CONDITION (Issue 2): No blocking route for /*/internal/** should exist in unfixed application.yml. " +
-                    "Counterexample: GET /account-service/internal/accounts is NOT blocked by gateway — " +
-                    "discovery locator forwards it to InternalAccountController.")
-                .isFalse();
+                .as("FIX APPLIED (Issue 2): block-internal-endpoints route must exist in application.yml after fix. " +
+                    "Fix: route added with Path=/*/internal/**, SetStatus=404, order=-100.")
+                .isTrue();
 
-        // Confirm discovery locator is enabled (the mechanism that exposes internal paths)
+        // Confirm discovery locator is still enabled (unchanged)
         boolean discoveryLocatorEnabled = yamlContent.contains("locator:")
                 && yamlContent.contains("enabled: true");
 
         assertThat(discoveryLocatorEnabled)
-                .as("Discovery locator must be enabled for the bug to be exploitable")
+                .as("Discovery locator must still be enabled (preservation: unchanged)")
                 .isTrue();
 
-        // Log counterexample
-        System.out.println("[COUNTEREXAMPLE Issue 2] isBugCondition_InternalExposed: path matches ^/([^/]+/)?internal(/.*)?$ is NOT blocked");
-        System.out.println("  → GET /account-service/internal/accounts → discovery locator forwards to downstream (no 404 from gateway)");
-        System.out.println("  → GET /transfer-service/internal/settle  → discovery locator forwards to downstream (no 404 from gateway)");
-        System.out.println("  → GET /internal/admin                    → discovery locator forwards to downstream (no 404 from gateway)");
+        // Log fix confirmation
+        System.out.println("[FIX CONFIRMED Issue 2] block-internal-endpoints route present in application.yml");
+        System.out.println("  → GET /account-service/internal/accounts → blocked with 404 (not forwarded)");
+        System.out.println("  → GET /transfer-service/internal/settle  → blocked with 404 (not forwarded)");
+        System.out.println("  → GET /internal/admin                    → blocked with 404 (not forwarded)");
     }
 
     /**
@@ -153,16 +146,12 @@ class BugConditionExplorationTest {
     // -------------------------------------------------------------------------
 
     /**
-     * Bug Condition: catch (Exception e) without log statement in JwtAuthenticationFilter.
+     * Fix Checking: JwtAuthenticationFilter now has Logger and split catch blocks.
      *
-     * Static verification: JwtAuthenticationFilter.java has a single broad catch(Exception e)
-     * with no Logger field and no log.warn/log.error call inside the catch block.
+     * Bug was: single broad catch(Exception e) with no Logger and no log calls.
+     * Fix applied (task 5): Logger added, catch split into JwtException (WARN) + Exception (ERROR).
      *
-     * Counterexample: "Token hết hạn → 401 nhưng không có WARN log;
-     *                  NullPointerException → 401 nhưng không có ERROR log với stack trace"
-     *
-     * EXPECTED OUTCOME: This assertion PASSES (confirms the bug condition holds).
-     * When the fix is applied (task 5), the catch block will be split and logging added.
+     * EXPECTED OUTCOME: This assertion PASSES (confirms the fix is in place).
      */
     @Test
     void isBugCondition_JwtException_catchBlockIsUndifferentiatedAndSilent() throws Exception {
@@ -170,36 +159,36 @@ class BugConditionExplorationTest {
             "src/main/java/com/fintech/gateway/filter/JwtAuthenticationFilter.java");
         String sourceCode = Files.readString(filterFile);
 
-        // Bug condition 1: no Logger field declared
+        // Fix applied: Logger field MUST now be declared
         boolean hasLoggerField = sourceCode.contains("Logger log")
                 || sourceCode.contains("Logger LOG")
                 || sourceCode.contains("LoggerFactory.getLogger");
 
         assertThat(hasLoggerField)
-                .as("BUG CONDITION (Issue 3): JwtAuthenticationFilter must NOT have a Logger on unfixed code. " +
-                    "Counterexample: expired token → 401 but no WARN log emitted.")
-                .isFalse();
+                .as("FIX APPLIED (Issue 3): JwtAuthenticationFilter must have a Logger after fix. " +
+                    "Fix: SLF4J Logger added via LoggerFactory.getLogger.")
+                .isTrue();
 
-        // Bug condition 2: single broad catch(Exception e) — not split into JwtException + Exception
+        // Fix applied: catch block MUST be split into JwtException + Exception
         boolean hasSplitCatch = sourceCode.contains("catch (JwtException");
 
         assertThat(hasSplitCatch)
-                .as("BUG CONDITION (Issue 3): catch block must NOT be split into JwtException vs Exception on unfixed code. " +
-                    "Counterexample: NullPointerException during parse → 401 but no ERROR log with stack trace.")
-                .isFalse();
+                .as("FIX APPLIED (Issue 3): catch block must be split into JwtException vs Exception after fix. " +
+                    "Fix: JwtException → WARN log; Exception → ERROR log with stack trace.")
+                .isTrue();
 
-        // Bug condition 3: no log call inside catch block
+        // Fix applied: log calls MUST exist inside catch blocks
         boolean hasLogInCatch = sourceCode.contains("log.warn") || sourceCode.contains("log.error");
 
         assertThat(hasLogInCatch)
-                .as("BUG CONDITION (Issue 3): No log.warn or log.error call should exist in unfixed code.")
-                .isFalse();
+                .as("FIX APPLIED (Issue 3): log.warn or log.error call must exist in fixed code.")
+                .isTrue();
 
-        // Log counterexample
-        System.out.println("[COUNTEREXAMPLE Issue 3] isBugCondition_JwtException: catch (Exception e) — no Logger, no log call");
-        System.out.println("  → ExpiredJwtException  → 401 returned, but NO WARN log (security event invisible)");
-        System.out.println("  → MalformedJwtException → 401 returned, but NO WARN log (attack not auditable)");
-        System.out.println("  → NullPointerException  → 401 returned, but NO ERROR log with stack trace (bug undebuggable)");
+        // Log fix confirmation
+        System.out.println("[FIX CONFIRMED Issue 3] JwtAuthenticationFilter: Logger present, catch blocks split");
+        System.out.println("  → ExpiredJwtException  → 401 returned + WARN log (security event visible)");
+        System.out.println("  → MalformedJwtException → 401 returned + WARN log (attack auditable)");
+        System.out.println("  → NullPointerException  → 401 returned + ERROR log with stack trace (debuggable)");
     }
 
     // -------------------------------------------------------------------------
@@ -207,16 +196,13 @@ class BugConditionExplorationTest {
     // -------------------------------------------------------------------------
 
     /**
-     * Bug Condition: allowedOriginsSource = "HARDCODED_IN_SOURCE_CODE"
+     * Fix Checking: SecurityConfig now injects CORS origins from @Value property.
      *
-     * Static verification: SecurityConfig.java uses List.of("http://localhost:3000") directly,
-     * with no @Value injection and no property in application.yml for CORS origins.
+     * Bug was: "http://localhost:3000" hardcoded, no @Value injection, no property in application.yml.
+     * Fix applied (task 6): @Value("${gateway.cors.allowed-origins:http://localhost:3000}") injected,
+     * property added to application.yml.
      *
-     * Counterexample: "CORS preflight từ https://app.fintech.com bị block dù đã set env var
-     *                  GATEWAY_CORS_ALLOWED_ORIGINS=https://app.fintech.com"
-     *
-     * EXPECTED OUTCOME: This assertion PASSES (confirms the bug condition holds).
-     * When the fix is applied (task 6), @Value injection will be used.
+     * EXPECTED OUTCOME: This assertion PASSES (confirms the fix is in place).
      */
     @Test
     void isBugCondition_CorsHardcode_allowedOriginsIsLiteralInSourceCode() throws Exception {
@@ -224,82 +210,83 @@ class BugConditionExplorationTest {
             "src/main/java/com/fintech/gateway/config/SecurityConfig.java");
         String sourceCode = Files.readString(securityConfigFile);
 
-        // Bug condition 1: hardcoded origin literal present
-        boolean hasHardcodedOrigin = sourceCode.contains("\"http://localhost:3000\"");
-
-        assertThat(hasHardcodedOrigin)
-                .as("BUG CONDITION (Issue 4): SecurityConfig must contain hardcoded 'http://localhost:3000' on unfixed code. " +
-                    "Counterexample: CORS preflight from https://app.fintech.com is BLOCKED even when " +
-                    "GATEWAY_CORS_ALLOWED_ORIGINS=https://app.fintech.com is set.")
-                .isTrue();
-
-        // Bug condition 2: no @Value injection for CORS origins
+        // Fix applied: @Value annotation MUST now be present for CORS origins
         boolean hasValueAnnotation = sourceCode.contains("@Value") &&
                 (sourceCode.contains("cors.allowed-origins") || sourceCode.contains("GATEWAY_CORS"));
 
         assertThat(hasValueAnnotation)
-                .as("BUG CONDITION (Issue 4): SecurityConfig must NOT have @Value injection for CORS origins on unfixed code.")
-                .isFalse();
+                .as("FIX APPLIED (Issue 4): SecurityConfig must have @Value injection for CORS origins after fix. " +
+                    "Fix: @Value(\"${gateway.cors.allowed-origins:http://localhost:3000}\") injected.")
+                .isTrue();
 
-        // Bug condition 3: application.yml has no gateway.cors property
+        // Fix applied: application.yml MUST now have gateway.cors property
         Path applicationYml = Paths.get("src/main/resources/application.yml");
         String yamlContent = Files.readString(applicationYml);
 
         boolean hasCorsProperty = yamlContent.contains("gateway:") && yamlContent.contains("cors:");
 
         assertThat(hasCorsProperty)
-                .as("BUG CONDITION (Issue 4): application.yml must NOT have gateway.cors property on unfixed code.")
-                .isFalse();
+                .as("FIX APPLIED (Issue 4): application.yml must have gateway.cors property after fix. " +
+                    "Fix: gateway.cors.allowed-origins property added with env var support.")
+                .isTrue();
 
-        // Log counterexample
-        System.out.println("[COUNTEREXAMPLE Issue 4] isBugCondition_CorsHardcode: allowedOriginsSource = HARDCODED_IN_SOURCE_CODE");
+        // Preservation: http://localhost:3000 still present as default fallback
+        boolean hasLocalhostFallback = sourceCode.contains("http://localhost:3000")
+                || yamlContent.contains("http://localhost:3000");
+
+        assertThat(hasLocalhostFallback)
+                .as("PRESERVATION (Issue 4): http://localhost:3000 must remain as default fallback after fix.")
+                .isTrue();
+
+        // Log fix confirmation
+        System.out.println("[FIX CONFIRMED Issue 4] SecurityConfig: @Value injection for CORS origins");
         System.out.println("  → Deploy with GATEWAY_CORS_ALLOWED_ORIGINS=https://app.fintech.com");
-        System.out.println("  → OPTIONS https://app.fintech.com → BLOCKED (Access-Control-Allow-Origin: http://localhost:3000 only)");
-        System.out.println("  → Docker/prod frontend at http://frontend:3000 → BLOCKED");
+        System.out.println("  → OPTIONS https://app.fintech.com → ALLOWED (origin read from property)");
+        System.out.println("  → Dev without env var → fallback to http://localhost:3000 (preserved)");
     }
 
     /**
-     * Summary test: prints all confirmed counterexamples in one place for easy review.
+     * Summary test: prints all confirmed fixes in one place for easy review.
      */
     @Test
     void bugConditionSummary_allFourIssuesConfirmed() throws Exception {
         System.out.println("=================================================================");
-        System.out.println("BUG CONDITION EXPLORATION SUMMARY — api-gateway (unfixed code)");
+        System.out.println("BUG FIX CONFIRMATION SUMMARY — api-gateway (fixed code)");
         System.out.println("=================================================================");
 
-        // Issue 1
+        // Issue 1 — Fix: integration test class now exists
         Path integrationTestFile = Paths.get("src/test/java/com/fintech/gateway/ApiGatewayApplicationTests.java");
-        boolean issue1 = !Files.exists(integrationTestFile);
-        System.out.printf("[Issue 1] isBugCondition_NoTest = %b%n", issue1);
-        System.out.println("  Counterexample: ApiGatewayApplicationTests.java does not exist");
+        boolean issue1Fixed = Files.exists(integrationTestFile);
+        System.out.printf("[Issue 1] Fix applied — ApiGatewayApplicationTests.java exists: %b%n", issue1Fixed);
+        System.out.println("  Fix: integration test class created with 4 test methods");
 
-        // Issue 2
+        // Issue 2 — Fix: blocking route now exists
         Path applicationYml = Paths.get("src/main/resources/application.yml");
         String yaml = Files.readString(applicationYml);
-        boolean issue2 = !yaml.contains("block-internal-endpoints") && yaml.contains("enabled: true");
-        System.out.printf("[Issue 2] isBugCondition_InternalExposed = %b%n", issue2);
-        System.out.println("  Counterexample: GET /account-service/internal/accounts not blocked by gateway");
+        boolean issue2Fixed = yaml.contains("block-internal-endpoints") && yaml.contains("SetStatus=404");
+        System.out.printf("[Issue 2] Fix applied — block-internal-endpoints route exists: %b%n", issue2Fixed);
+        System.out.println("  Fix: route added with Path=/*/internal/**,/internal/**, SetStatus=404, order=-100");
 
-        // Issue 3
+        // Issue 3 — Fix: Logger and split catch blocks now present
         Path filterFile = Paths.get("src/main/java/com/fintech/gateway/filter/JwtAuthenticationFilter.java");
         String filterSrc = Files.readString(filterFile);
-        boolean issue3 = !filterSrc.contains("LoggerFactory.getLogger") && !filterSrc.contains("catch (JwtException");
-        System.out.printf("[Issue 3] isBugCondition_JwtException = %b%n", issue3);
-        System.out.println("  Counterexample: ExpiredJwtException → 401 but no WARN log; NPE → 401 but no ERROR log");
+        boolean issue3Fixed = filterSrc.contains("LoggerFactory.getLogger") && filterSrc.contains("catch (JwtException");
+        System.out.printf("[Issue 3] Fix applied — Logger + split catch blocks: %b%n", issue3Fixed);
+        System.out.println("  Fix: JwtException → WARN log; Exception → ERROR log with stack trace");
 
-        // Issue 4
+        // Issue 4 — Fix: @Value injection now present
         Path securityConfig = Paths.get("src/main/java/com/fintech/gateway/config/SecurityConfig.java");
         String secSrc = Files.readString(securityConfig);
-        boolean issue4 = secSrc.contains("\"http://localhost:3000\"") && !secSrc.contains("@Value");
-        System.out.printf("[Issue 4] isBugCondition_CorsHardcode = %b%n", issue4);
-        System.out.println("  Counterexample: CORS preflight from https://app.fintech.com blocked despite env var");
+        boolean issue4Fixed = secSrc.contains("@Value") && secSrc.contains("cors.allowed-origins");
+        System.out.printf("[Issue 4] Fix applied — @Value injection for CORS origins: %b%n", issue4Fixed);
+        System.out.println("  Fix: CORS origins read from gateway.cors.allowed-origins property");
 
         System.out.println("=================================================================");
 
-        // All four must hold on unfixed code
-        assertThat(issue1).as("Issue 1 bug condition").isTrue();
-        assertThat(issue2).as("Issue 2 bug condition").isTrue();
-        assertThat(issue3).as("Issue 3 bug condition").isTrue();
-        assertThat(issue4).as("Issue 4 bug condition").isTrue();
+        // All four fixes must be confirmed
+        assertThat(issue1Fixed).as("Issue 1 bug condition").isTrue();
+        assertThat(issue2Fixed).as("Issue 2 bug condition").isTrue();
+        assertThat(issue3Fixed).as("Issue 3 bug condition").isTrue();
+        assertThat(issue4Fixed).as("Issue 4 bug condition").isTrue();
     }
 }

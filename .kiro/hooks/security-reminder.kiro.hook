@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Security Reminder",
+  "description": "Nhắc nhở về lỗ hổng bảo mật: backend services có thể bị gọi trực tiếp bypass API Gateway. Cần implement shared secret header + network isolation. Xem chi tiết tại TODO-security.md",
+  "version": "1",
+  "when": {
+    "type": "postTaskExecution"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Kiểm tra xem task vừa hoàn thành có phải là task cuối cùng hoặc gần cuối của việc implement các service chính (account-service, transfer-service, transaction-history-service) không. Nếu đúng, hãy nhắc user: \"Các service chính đã implement xong. Đừng quên xử lý lỗ hổng bảo mật: backend services hiện có thể bị gọi trực tiếp, bypass API Gateway. Xem chi tiết giải pháp tại TODO-security.md (Shared Secret Header + Network Isolation).\""
+  }
+}

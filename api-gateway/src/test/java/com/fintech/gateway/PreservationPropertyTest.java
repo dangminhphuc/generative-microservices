@@ -361,10 +361,11 @@ class PreservationPropertyTest {
     }
 
     /**
-     * Property 2: Preservation — No blocking route exists on unfixed code
+     * Property 2: Preservation — Blocking route exists and non-internal paths are NOT matched by it
      *
-     * On unfixed code, there is no block-internal-endpoints route, so non-internal
-     * paths cannot be accidentally blocked by it.
+     * After the fix, the block-internal-endpoints route exists. This test verifies that
+     * non-internal paths do NOT match the internal pattern, so they are NOT accidentally
+     * blocked by the new route.
      *
      * Validates: Requirements 3.3
      */
@@ -373,16 +374,28 @@ class PreservationPropertyTest {
         Path applicationYml = Paths.get("src/main/resources/application.yml");
         String yaml = Files.readString(applicationYml);
 
-        // On unfixed code: no blocking route exists
+        // After fix: blocking route exists — verify it targets only internal paths
         boolean hasBlockingRoute = yaml.contains("block-internal-endpoints")
                 || (yaml.contains("/internal/**") && yaml.contains("SetStatus=404"));
 
         assertThat(hasBlockingRoute)
-                .as("Preservation 2.4: on unfixed code, no block-internal-endpoints route should exist " +
-                    "(so non-internal paths cannot be accidentally blocked by it)")
-                .isFalse();
+                .as("Preservation 2.4: block-internal-endpoints route exists after fix — " +
+                    "verify non-internal paths are not matched by the internal pattern")
+                .isTrue();
 
-        System.out.println("[PRESERVATION 2.4] No block-internal-endpoints route on unfixed code → non-internal paths safe ✓");
+        // Verify non-internal paths do NOT match the internal pattern (so they won't be blocked)
+        Pattern internalPattern = Pattern.compile("^/([^/]+/)?internal(/.*)?$");
+        String[] nonInternalPaths = {
+            "/api/accounts/123", "/api/transfers/456", "/api/transactions/789",
+            "/api/auth/login", "/actuator/health"
+        };
+        for (String path : nonInternalPaths) {
+            assertThat(internalPattern.matcher(path).matches())
+                    .as("Preservation 2.4: non-internal path '%s' must NOT match internal pattern", path)
+                    .isFalse();
+        }
+
+        System.out.println("[PRESERVATION 2.4] block-internal-endpoints route present; non-internal paths not matched ✓");
     }
 
     /**
@@ -660,10 +673,10 @@ class PreservationPropertyTest {
         System.out.println("[2.3] All service routes present: " + routesPresent);
         assertThat(routesPresent).as("2.3 all routes present").isTrue();
 
-        // 2.4 No blocking route on unfixed code
-        boolean noBlockingRoute = !yaml.contains("block-internal-endpoints");
-        System.out.println("[2.4] No block-internal-endpoints route (unfixed): " + noBlockingRoute);
-        assertThat(noBlockingRoute).as("2.4 no blocking route on unfixed code").isTrue();
+        // 2.4 Blocking route exists (fix applied) and non-internal paths are not matched
+        boolean hasBlockingRoute = yaml.contains("block-internal-endpoints");
+        System.out.println("[2.4] block-internal-endpoints route present (fix applied): " + hasBlockingRoute);
+        assertThat(hasBlockingRoute).as("2.4 no blocking route on unfixed code").isTrue();
 
         // 2.5 CORS localhost:3000 fallback
         Path secConfig = Paths.get("src/main/java/com/fintech/gateway/config/SecurityConfig.java");

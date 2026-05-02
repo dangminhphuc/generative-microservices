@@ -1,0 +1,7 @@
+eureka:
+  instance:
+    hostname: ${EUREKA_INSTANCE_HOSTNAME:api-gateway}
+    prefer-ip-address: false
+  client:
+    service-url:
+      defaultZone: ${EUREKA_DEFAULT_ZONE:http://eureka:password@discovery-server:8761/eureka/}
