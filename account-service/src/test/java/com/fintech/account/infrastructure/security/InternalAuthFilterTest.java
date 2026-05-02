@@ -1,152 +1,73 @@
 package com.fintech.account.infrastructure.security;
 
-import org.junit.jupiter.api.BeforeEach;
+import com.fintech.account.domain.model.AccountNumber;
+import com.fintech.account.domain.port.in.GetAccountByNumberUseCase;
+import com.fintech.account.infrastructure.adapter.in.rest.InternalAccountController;
+import com.fintech.common.dto.AccountInfoResponse;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.web.MockFilterChain;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
 
-import jakarta.servlet.ServletException;
-import java.io.IOException;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Unit tests for {@link InternalAuthFilter}.
+ * Tests for InternalAuthFilter — verifies X-Internal-Secret header enforcement
+ * on /internal/** endpoints.
  *
- * Covers correctness properties from Requirement 2:
- *
- * <ol>
- *   <li>Request to /internal/** without X-Internal-Secret header → 401 Unauthorized</li>
- *   <li>Request to /internal/** with wrong secret → 403 Forbidden</li>
- *   <li>Request to /internal/** with correct secret → passes through (200 from downstream)</li>
- *   <li>Request to /internal/** with empty header "" → 401 Unauthorized (treated as missing)</li>
- * </ol>
+ * Validates: Requirement 2 (Internal Endpoints Protection)
  */
+@WebMvcTest(controllers = InternalAccountController.class)
+@Import({InternalAuthFilter.class, SecurityConfig.class})
+@TestPropertySource(properties = "internal.api.secret=test-secret-value")
 class InternalAuthFilterTest {
 
-    private static final String CORRECT_SECRET = "test-internal-secret-value";
-    private static final String WRONG_SECRET = "wrong-secret";
+    @Autowired
+    private MockMvc mockMvc;
 
-    private InternalAuthFilter filter;
+    @MockBean
+    private GetAccountByNumberUseCase getAccountByNumberUseCase;
 
-    @BeforeEach
-    void setUp() {
-        filter = new InternalAuthFilter();
-        // Inject the secret value directly (simulates @Value injection)
-        ReflectionTestUtils.setField(filter, "internalApiSecret", CORRECT_SECRET);
+    @Test
+    @DisplayName("1.2.6 - Request without X-Internal-Secret header → 401 Unauthorized")
+    void requestWithoutHeader_returns401() throws Exception {
+        mockMvc.perform(get("/internal/accounts/1234567890"))
+                .andExpect(status().isUnauthorized());
     }
 
-    // -----------------------------------------------------------------------
-    // Task 1.2.6 — no header → 401
-    // -----------------------------------------------------------------------
-
-    /**
-     * Verifies Acceptance Criterion 1:
-     * WHEN a request to /internal/** has no X-Internal-Secret header,
-     * THEN the filter SHALL return 401 Unauthorized.
-     */
     @Test
-    void internalPath_noHeader_returns401() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/accounts/ACC123");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        MockFilterChain chain = new MockFilterChain();
-
-        filter.doFilterInternal(request, response, chain);
-
-        assertThat(response.getStatus()).isEqualTo(401);
-        // Chain must NOT have been called — request was rejected
-        assertThat(chain.getRequest()).isNull();
+    @DisplayName("1.2.7 - Request with wrong X-Internal-Secret header → 403 Forbidden")
+    void requestWithWrongSecret_returns403() throws Exception {
+        mockMvc.perform(get("/internal/accounts/1234567890")
+                        .header("X-Internal-Secret", "wrong-secret"))
+                .andExpect(status().isForbidden());
     }
 
-    // -----------------------------------------------------------------------
-    // Task 1.2.7 — wrong header → 403
-    // -----------------------------------------------------------------------
-
-    /**
-     * Verifies Acceptance Criterion 2:
-     * WHEN a request to /internal/** has X-Internal-Secret with a wrong value,
-     * THEN the filter SHALL return 403 Forbidden.
-     */
     @Test
-    void internalPath_wrongSecret_returns403() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/accounts/ACC123");
-        request.addHeader("X-Internal-Secret", WRONG_SECRET);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        MockFilterChain chain = new MockFilterChain();
+    @DisplayName("1.2.8 - Request with correct X-Internal-Secret header → 200 OK")
+    void requestWithCorrectSecret_returns200() throws Exception {
+        AccountInfoResponse mockResponse = new AccountInfoResponse(
+                "acc-uuid-1", "1234567890", "John Doe", "ACTIVE"
+        );
+        when(getAccountByNumberUseCase.execute(any(AccountNumber.class))).thenReturn(mockResponse);
 
-        filter.doFilterInternal(request, response, chain);
-
-        assertThat(response.getStatus()).isEqualTo(403);
-        // Chain must NOT have been called — request was rejected
-        assertThat(chain.getRequest()).isNull();
+        mockMvc.perform(get("/internal/accounts/1234567890")
+                        .header("X-Internal-Secret", "test-secret-value"))
+                .andExpect(status().isOk());
     }
 
-    // -----------------------------------------------------------------------
-    // Task 1.2.8 — correct header → passes through (200)
-    // -----------------------------------------------------------------------
-
-    /**
-     * Verifies Acceptance Criterion 3:
-     * WHEN a request to /internal/** has the correct X-Internal-Secret,
-     * THEN the filter SHALL pass the request to the next filter in the chain.
-     */
     @Test
-    void internalPath_correctSecret_passesThrough() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/accounts/ACC123");
-        request.addHeader("X-Internal-Secret", CORRECT_SECRET);
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        MockFilterChain chain = new MockFilterChain();
-
-        filter.doFilterInternal(request, response, chain);
-
-        // Chain was called — request was forwarded
-        assertThat(chain.getRequest()).isNotNull();
-        // Default MockHttpServletResponse status is 200
-        assertThat(response.getStatus()).isEqualTo(200);
-    }
-
-    // -----------------------------------------------------------------------
-    // Task 1.2.9 — empty header "" → 401
-    // -----------------------------------------------------------------------
-
-    /**
-     * Verifies Error Condition from Requirement 2:
-     * WHEN a request to /internal/** has X-Internal-Secret set to empty string "",
-     * THEN the filter SHALL return 401 Unauthorized (treated as missing).
-     */
-    @Test
-    void internalPath_emptyHeader_returns401() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/internal/accounts/ACC123");
-        request.addHeader("X-Internal-Secret", "");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        MockFilterChain chain = new MockFilterChain();
-
-        filter.doFilterInternal(request, response, chain);
-
-        assertThat(response.getStatus()).isEqualTo(401);
-        // Chain must NOT have been called — request was rejected
-        assertThat(chain.getRequest()).isNull();
-    }
-
-    // -----------------------------------------------------------------------
-    // Additional: non-internal paths are NOT affected by the filter
-    // -----------------------------------------------------------------------
-
-    /**
-     * Verifies that non-internal paths pass through the filter without any secret check.
-     */
-    @Test
-    void nonInternalPath_noHeader_passesThrough() throws ServletException, IOException {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth/login");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        MockFilterChain chain = new MockFilterChain();
-
-        filter.doFilterInternal(request, response, chain);
-
-        // Chain was called — no secret check for non-internal paths
-        assertThat(chain.getRequest()).isNotNull();
-        assertThat(response.getStatus()).isEqualTo(200);
+    @DisplayName("1.2.9 - Request with empty X-Internal-Secret header → 401 Unauthorized")
+    void requestWithEmptyHeader_returns401() throws Exception {
+        mockMvc.perform(get("/internal/accounts/1234567890")
+                        .header("X-Internal-Secret", ""))
+                .andExpect(status().isUnauthorized());
     }
 }

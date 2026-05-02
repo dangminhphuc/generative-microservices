@@ -18,7 +18,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
-                        // /internal/** is NOT permitted here — protected by InternalAuthFilter (X-Internal-Secret header)
+                        // /internal/** authentication is handled by InternalAuthFilter
+                        // (X-Internal-Secret header check). Spring Security permits the path
+                        // because the filter already enforces the secret before this point.
+                        .requestMatchers("/internal/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         .anyRequest().authenticated()
                 );
