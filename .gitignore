@@ -20,3 +20,6 @@ logs/
 
 # Spring Boot
 application-prod.yml
+
+# Prometheus — generated from template, contains credentials
+infra/prometheus/prometheus.yml
