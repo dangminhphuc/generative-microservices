@@ -2,48 +2,48 @@
 
 ## Phase 1 — Security Fixes (api-gateway)
 
-- [ ] 1.1 Block internal endpoints via gateway route
-  - [ ] 1.1.1 Checkout develop and create branch `fix/api-gateway-block-internal-endpoints`
-  - [ ] 1.1.2 Add `block-internal-endpoints` route to `application.yml` with `Path=/*/internal/**,/internal/**`, `SetStatus=404`, `order: -100`
-  - [ ] 1.1.3 Verify `BugConditionExplorationTest.isBugCondition_InternalExposed_noBlockingRouteInApplicationYml` passes
-  - [ ] 1.1.4 Verify `PreservationPropertyTest` still passes
-  - [ ] 1.1.5 Commit: `fix(api-gateway): block internal endpoints via gateway route (order -100, SetStatus 404)`
-  - [ ] 1.1.6 Push branch and ask user for merge confirmation
+- [x] 1.1 Block internal endpoints via gateway route
+  - [x] 1.1.1 Checkout develop and create branch `fix/api-gateway-block-internal-endpoints`
+  - [x] 1.1.2 Add `block-internal-endpoints` route to `application.yml` with `Path=/*/internal/**,/internal/**`, `SetStatus=404`, `order: -100`
+  - [x] 1.1.3 Verify `BugConditionExplorationTest.isBugCondition_InternalExposed_noBlockingRouteInApplicationYml` passes
+  - [x] 1.1.4 Verify `PreservationPropertyTest` still passes
+  - [x] 1.1.5 Commit: `fix(api-gateway): block internal endpoints via gateway route (order -100, SetStatus 404)`
+  - [x] 1.1.6 Push branch and ask user for merge confirmation
 
-- [ ] 1.2 Fix JWT exception handling with SLF4J logging
-  - [ ] 1.2.1 Checkout develop and create branch `fix/api-gateway-jwt-exception-logging`
-  - [ ] 1.2.2 Add `private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class)` to `JwtAuthenticationFilter.java`
-  - [ ] 1.2.3 Split `catch (Exception e)` into `catch (JwtException e)` with `log.warn` and `catch (Exception e)` with `log.error`
-  - [ ] 1.2.4 Verify `BugConditionExplorationTest.isBugCondition_JwtException_catchBlockIsUndifferentiatedAndSilent` passes
-  - [ ] 1.2.5 Verify `JwtAuthenticationFilterTest` still passes
-  - [ ] 1.2.6 Commit: `fix(api-gateway): distinguish JwtException (WARN) from system exceptions (ERROR) with SLF4J logging`
-  - [ ] 1.2.7 Push branch and ask user for merge confirmation
+- [x] 1.2 Fix JWT exception handling with SLF4J logging
+  - [x] 1.2.1 Checkout develop and create branch `fix/api-gateway-jwt-exception-logging`
+  - [x] 1.2.2 Add `private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class)` to `JwtAuthenticationFilter.java`
+  - [x] 1.2.3 Split `catch (Exception e)` into `catch (JwtException e)` with `log.warn` and `catch (Exception e)` with `log.error`
+  - [x] 1.2.4 Verify `BugConditionExplorationTest.isBugCondition_JwtException_catchBlockIsUndifferentiatedAndSilent` passes
+  - [x] 1.2.5 Verify `JwtAuthenticationFilterTest` still passes
+  - [x] 1.2.6 Commit: `fix(api-gateway): distinguish JwtException (WARN) from system exceptions (ERROR) with SLF4J logging`
+  - [x] 1.2.7 Push branch and ask user for merge confirmation
 
-- [ ] 1.3 Externalize CORS allowed-origins via environment variable
-  - [ ] 1.3.1 Checkout develop and create branch `fix/api-gateway-externalize-cors`
-  - [ ] 1.3.2 Add `@Value("${gateway.cors.allowed-origins:http://localhost:3000}")` field to `SecurityConfig.java`
-  - [ ] 1.3.3 Parse comma-separated string into `List<String>` and replace hardcoded origin
-  - [ ] 1.3.4 Add `gateway.cors.allowed-origins: http://localhost:3000` to `application.yml`
-  - [ ] 1.3.5 Add `gateway.cors.allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000}` to `application-docker.yml`
-  - [ ] 1.3.6 Verify `BugConditionExplorationTest.isBugCondition_CorsHardcode_allowedOriginsIsLiteralInSourceCode` passes
-  - [ ] 1.3.7 Verify `PreservationPropertyTest` still passes (localhost:3000 preserved as fallback)
-  - [ ] 1.3.8 Commit: `fix(api-gateway): externalize CORS allowed-origins via GATEWAY_CORS_ALLOWED_ORIGINS env var`
-  - [ ] 1.3.9 Push branch and ask user for merge confirmation
+- [x] 1.3 Externalize CORS allowed-origins via environment variable
+  - [x] 1.3.1 Checkout develop and create branch `fix/api-gateway-externalize-cors`
+  - [x] 1.3.2 Add `@Value("${gateway.cors.allowed-origins:http://localhost:3000}")` field to `SecurityConfig.java`
+  - [x] 1.3.3 Parse comma-separated string into `List<String>` and replace hardcoded origin
+  - [x] 1.3.4 Add `gateway.cors.allowed-origins: http://localhost:3000` to `application.yml`
+  - [x] 1.3.5 Add `gateway.cors.allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000}` to `application-docker.yml`
+  - [x] 1.3.6 Verify `BugConditionExplorationTest.isBugCondition_CorsHardcode_allowedOriginsIsLiteralInSourceCode` passes
+  - [x] 1.3.7 Verify `PreservationPropertyTest` still passes (localhost:3000 preserved as fallback)
+  - [x] 1.3.8 Commit: `fix(api-gateway): externalize CORS allowed-origins via GATEWAY_CORS_ALLOWED_ORIGINS env var`
+  - [x] 1.3.9 Push branch and ask user for merge confirmation
 
 ## Phase 2 — Testing
 
-- [ ] 2.1 Add api-gateway integration tests
-  - [ ] 2.1.1 Checkout develop and create branch `test/api-gateway-integration-test`
-  - [ ] 2.1.2 Create/update `ApiGatewayApplicationTests.java` with `@SpringBootTest`
-  - [ ] 2.1.3 Add test: Spring context loads without exception
-  - [ ] 2.1.4 Add test: `/actuator/health` returns 200
-  - [ ] 2.1.5 Add test: JWT filter is registered in context
-  - [ ] 2.1.6 Add test: public paths bypass JWT filter (e.g. `/api/auth/login`)
-  - [ ] 2.1.7 Run `mvn test -pl api-gateway` and verify all tests pass
-  - [ ] 2.1.8 Commit: `test(api-gateway): add integration tests for context load, health endpoint, JWT filter, public path bypass`
+- [x] 2.1 Add api-gateway integration tests
+  - [x] 2.1.1 Checkout develop and create branch `test/api-gateway-integration-test`
+  - [x] 2.1.2 Create/update `ApiGatewayApplicationTests.java` with `@SpringBootTest`
+  - [x] 2.1.3 Add test: Spring context loads without exception
+  - [x] 2.1.4 Add test: `/actuator/health` returns 200
+  - [x] 2.1.5 Add test: JWT filter is registered in context
+  - [x] 2.1.6 Add test: public paths bypass JWT filter (e.g. `/api/auth/login`)
+  - [x] 2.1.7 Run `mvn test -pl api-gateway` and verify all tests pass
+  - [x] 2.1.8 Commit: `test(api-gateway): add integration tests for context load, health endpoint, JWT filter, public path bypass`
   - [ ] 2.1.9 Push branch and ask user for merge confirmation
 
-- [ ] 2.2 Add discovery-server HA integration tests
+- [~] 2.2 Add discovery-server HA integration tests
   - [ ] 2.2.1 Checkout develop and create branch `test/discovery-server-ha-tests`
   - [ ] 2.2.2 Update `DiscoveryServerApplicationTests.java` with standalone profile tests
   - [ ] 2.2.3 Create `DiscoveryServerHaTest.java` with security and health tests
