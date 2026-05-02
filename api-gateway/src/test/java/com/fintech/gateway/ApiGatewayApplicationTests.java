@@ -17,7 +17,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Bug_Condition: isBugCondition_NoTest — testClassExists("ApiGatewayApplicationTests") = FALSE
  * Expected_Behavior: Test class tồn tại với 4 test methods xác nhận context load, health, JWT filter, public path
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
+                // Redis is not available in the test environment.
+                // Disable the Redis health indicator so /actuator/health returns UP (200)
+                // instead of DOWN (503) when Redis is unreachable.
+                "management.health.redis.enabled=false"
+        })
 @ActiveProfiles("dev")
 class ApiGatewayApplicationTests {
 

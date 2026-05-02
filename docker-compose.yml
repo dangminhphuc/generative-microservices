@@ -2,6 +2,17 @@ services:
 
   # --- Infrastructure ---
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   account-db:
     image: postgres:16-alpine
     environment:
@@ -135,8 +146,12 @@ services:
         condition: service_healthy
       discovery-server-2:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
 
   account-service:
     build:
