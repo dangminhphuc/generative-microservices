@@ -51,12 +51,6 @@ spring:
           filters:
             - StripPrefix=1
 
-# WARNING: The default fallback value below is intentionally committed to source control
-# for local development and automated testing ONLY.
-# It MUST NOT be used in production. JwtSecretValidator (active on profile "prod") will
-# throw IllegalStateException and prevent startup if this default value is detected.
-# On production, set the JWT_SECRET environment variable to a cryptographically secure
-# random string of at least 256 bits (32+ bytes).
 jwt:
   secret: ${JWT_SECRET:fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}
 
