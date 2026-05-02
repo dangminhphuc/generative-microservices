@@ -9,5 +9,7 @@ eureka:
       defaultZone: ${EUREKA_PEER_URLS}
   server:
     enable-self-preservation: true
+    # Self-preservation: activates when < 85% of instances send heartbeats on time.
+    # Keeps registry intact instead of evicting instances during network instability.
     renewal-percent-threshold: 0.85
     eviction-interval-timer-in-ms: 30000
