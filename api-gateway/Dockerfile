@@ -9,6 +9,7 @@ RUN apk add --no-cache maven && \
     mvn -pl common,api-gateway -am package -DskipTests -q
 
 FROM eclipse-temurin:21-jre-alpine
+RUN apk add --no-cache curl
 WORKDIR /app
 COPY --from=build /app/api-gateway/target/*.jar app.jar
 EXPOSE 8080
