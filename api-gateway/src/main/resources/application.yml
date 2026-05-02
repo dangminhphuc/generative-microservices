@@ -15,6 +15,9 @@ spring:
       port: ${REDIS_PORT:6379}
   cloud:
     gateway:
+      httpclient:
+        connect-timeout: 2000      # 2 seconds to establish connection
+        response-timeout: 10s      # 10 seconds to receive first response byte
       discovery:
         locator:
           enabled: true
@@ -42,6 +45,10 @@ spring:
                 redis-rate-limiter.burstCapacity: 10
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@ipKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: account-service-auth-cb
+                fallbackUri: forward:/fallback/service-unavailable
 
         - id: account-service
           uri: lb://account-service
@@ -56,6 +63,10 @@ spring:
                 redis-rate-limiter.burstCapacity: 100
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: account-service-cb
+                fallbackUri: forward:/fallback/service-unavailable
 
         - id: transfer-service
           uri: lb://transfer-service
@@ -70,6 +81,10 @@ spring:
                 redis-rate-limiter.burstCapacity: 100
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: transfer-service-cb
+                fallbackUri: forward:/fallback/service-unavailable
 
         - id: transaction-history-service
           uri: lb://transaction-history-service
@@ -84,6 +99,10 @@ spring:
                 redis-rate-limiter.burstCapacity: 100
                 redis-rate-limiter.requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: transaction-history-service-cb
+                fallbackUri: forward:/fallback/service-unavailable
 
 jwt:
   secret: ${JWT_SECRET:fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}
@@ -105,3 +124,27 @@ logging:
 gateway:
   cors:
     allowed-origins: http://localhost:3000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      account-service-auth-cb:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      account-service-cb:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      transfer-service-cb:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+      transaction-history-service-cb:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
