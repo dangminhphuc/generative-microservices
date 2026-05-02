@@ -7,6 +7,12 @@ spring:
     name: api-gateway
   profiles:
     default: dev
+  data:
+    redis:
+      # Redis connection for RequestRateLimiter (token bucket via Lua script).
+      # Override REDIS_HOST / REDIS_PORT in docker/prod environments.
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   cloud:
     gateway:
       discovery:
@@ -29,6 +35,13 @@ spring:
             - Path=/api/auth/**
           filters:
             - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                # 10 requests/minute per IP — brute-force protection on auth endpoints
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 10
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@ipKeyResolver}"
 
         - id: account-service
           uri: lb://account-service
@@ -36,6 +49,13 @@ spring:
             - Path=/api/accounts/**
           filters:
             - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                # 100 requests/minute per authenticated user
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 100
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
         - id: transfer-service
           uri: lb://transfer-service
@@ -43,6 +63,13 @@ spring:
             - Path=/api/transfers/**
           filters:
             - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                # 100 requests/minute per authenticated user
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 100
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
         - id: transaction-history-service
           uri: lb://transaction-history-service
@@ -50,6 +77,13 @@ spring:
             - Path=/api/transactions/**
           filters:
             - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                # 100 requests/minute per authenticated user
+                redis-rate-limiter.replenishRate: 100
+                redis-rate-limiter.burstCapacity: 100
+                redis-rate-limiter.requestedTokens: 1
+                key-resolver: "#{@userKeyResolver}"
 
 jwt:
   secret: ${JWT_SECRET:fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}
