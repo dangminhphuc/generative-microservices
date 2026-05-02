@@ -1,0 +1,9 @@
+eureka:
+  instance:
+    hostname: ${EUREKA_INSTANCE_HOSTNAME}
+    prefer-ip-address: false
+  client:
+    service-url:
+      # Point to multiple Eureka peers for HA. Example:
+      # defaultZone: http://user:pass@eureka1:8761/eureka/,http://user:pass@eureka2:8761/eureka/
+      defaultZone: ${EUREKA_DEFAULT_ZONE}
