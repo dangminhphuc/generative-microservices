@@ -1,54 +1,69 @@
 server:
   port: 8080
+  shutdown: graceful
 
 spring:
   application:
     name: api-gateway
+  profiles:
+    default: dev
   cloud:
     gateway:
       discovery:
         locator:
           enabled: true
           lower-case-service-id: true
-#      routes:
-#        - id: account-service-auth
-#          uri: lb://account-service
-#          predicates:
-#            - Path=/api/auth/**
-#          filters:
-#            - StripPrefix=1
-#
-#        - id: account-service
-#          uri: lb://account-service
-#          predicates:
-#            - Path=/api/accounts/**
-#          filters:
-#            - StripPrefix=1
-#
-#        - id: transfer-service
-#          uri: lb://transfer-service
-#          predicates:
-#            - Path=/api/transfers/**
-#          filters:
-#            - StripPrefix=1
-#
-#        - id: transaction-history-service
-#          uri: lb://transaction-history-service
-#          predicates:
-#            - Path=/api/transactions/**
-#          filters:
-#            - StripPrefix=1
+      routes:
+        # SECURITY: Block all internal endpoints — must be first route
+        - id: block-internal-endpoints
+          uri: no://op
+          predicates:
+            - Path=/*/internal/**,/internal/**
+          filters:
+            - SetStatus=404
+          order: -100
 
-#eureka:
-#  client:
-#    service-url:
-#      defaultZone: http://localhost:8761/eureka/
+        - id: account-service-auth
+          uri: lb://account-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - StripPrefix=1
+
+        - id: account-service
+          uri: lb://account-service
+          predicates:
+            - Path=/api/accounts/**
+          filters:
+            - StripPrefix=1
+
+        - id: transfer-service
+          uri: lb://transfer-service
+          predicates:
+            - Path=/api/transfers/**
+          filters:
+            - StripPrefix=1
+
+        - id: transaction-history-service
+          uri: lb://transaction-history-service
+          predicates:
+            - Path=/api/transactions/**
+          filters:
+            - StripPrefix=1
 
 jwt:
-  secret: fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256
+  secret: ${JWT_SECRET:fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: api-gateway
+
+logging:
+  level:
+    "[org.springframework.cloud.gateway]": WARN
+    "[com.fintech]": INFO
