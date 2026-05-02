@@ -1,0 +1,6 @@
+eureka:
+  client:
+    service-url:
+      # Register with both Eureka instances for HA failover.
+      # If one instance goes down, the service remains discoverable via the other.
+      defaultZone: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
