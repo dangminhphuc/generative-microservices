@@ -20,6 +20,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +53,7 @@ public class BankAccountService implements CreateBankAccountUseCase, GetBalanceU
 
     @Override
     @Transactional
+    @CacheEvict(value = "accounts-by-userId", key = "#command.userId()")
     public CreateBankAccountResponse execute(CreateBankAccountCommand command) {
         var user = userRepository.findById(command.userId())
                 .orElseThrow(() -> new ResourceNotFoundException("User", command.userId().toString()));
@@ -83,6 +86,7 @@ public class BankAccountService implements CreateBankAccountUseCase, GetBalanceU
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "accounts-by-userId", key = "#userId")
     public BalanceResponse execute(UUID userId) {
         var accounts = bankAccountRepository.findByUserId(userId);
         var balances = accounts.stream()
@@ -99,6 +103,7 @@ public class BankAccountService implements CreateBankAccountUseCase, GetBalanceU
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(value = "accounts-by-number", key = "#accountNumber.value")
     public AccountInfoResponse execute(AccountNumber accountNumber) {
         var account = bankAccountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new ResourceNotFoundException("Account", accountNumber.getValue()));

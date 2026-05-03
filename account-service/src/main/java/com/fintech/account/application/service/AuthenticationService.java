@@ -16,6 +16,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +46,7 @@ public class AuthenticationService implements LoginUseCase, RefreshTokenUseCase 
 
     @Override
     @Transactional
+    @CacheEvict(value = "users-by-email", key = "#command.email()")
     public LoginResponse execute(LoginCommand command) {
         Email email = Email.of(command.email());
         User user = userRepository.findByEmail(email)

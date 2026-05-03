@@ -16,6 +16,8 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,6 +46,11 @@ public class DebitCreditService implements DebitCreditUseCase {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "accounts-by-number", key = "#event.sourceAccountNumber"),
+            @CacheEvict(value = "accounts-by-number", key = "#event.destinationAccountNumber"),
+            @CacheEvict(value = "accounts-by-userId", allEntries = true)
+    })
     public void execute(TransferInitiatedEvent event) {
         String transferId = event.getAggregateId();
 
