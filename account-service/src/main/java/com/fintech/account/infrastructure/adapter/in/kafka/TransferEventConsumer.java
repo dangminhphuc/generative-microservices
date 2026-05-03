@@ -21,6 +21,11 @@ public class TransferEventConsumer {
     @KafkaListener(topics = "transfer-events", groupId = "account-service-group")
     public void handleTransferInitiated(TransferInitiatedEvent event) {
         log.info("Received TransferInitiatedEvent for transfer {}", event.getAggregateId());
-        debitCreditUseCase.execute(event);
+        try {
+            debitCreditUseCase.execute(event);
+        } catch (Exception e) {
+            log.error("Failed to process transfer {}: {}", event.getAggregateId(), e.getMessage());
+            throw e;  // Re-throw để DefaultErrorHandler xử lý retry + DLQ
+        }
     }
 }
