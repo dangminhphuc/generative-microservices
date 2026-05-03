@@ -78,6 +78,14 @@ services:
     networks:
       - internal
 
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: zipkin
+    ports:
+      - "9411:9411"
+    networks:
+      - internal
+
   prometheus:
     image: prom/prometheus:v2.53.0
     ports:
@@ -235,6 +243,7 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-in-production}
+      ZIPKIN_URL: http://zipkin:9411
     networks:
       - internal
 
