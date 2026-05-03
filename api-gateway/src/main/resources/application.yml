@@ -124,6 +124,7 @@ logging:
     "[com.fintech]": INFO
 
 gateway:
+  internal-secret: ${GATEWAY_INTERNAL_SECRET:dev-gateway-secret-for-local-only}
   cors:
     allowed-origins: http://localhost:3000
 

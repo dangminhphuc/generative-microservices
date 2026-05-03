@@ -36,6 +36,10 @@ eureka:
   instance:
     prefer-ip-address: true
 
+internal:
+  api:
+    secret: ${INTERNAL_API_SECRET:dev-internal-secret-for-local-only}
+
 transaction-history:
   default-page-size: 20
   max-date-range-months: 12

@@ -47,6 +47,10 @@ transfer:
   daily-limit: 500000000
   minimum-amount: 1000
 
+internal:
+  api:
+    secret: ${INTERNAL_API_SECRET:dev-internal-secret-for-local-only}
+
 management:
   endpoints:
     web:

@@ -12,6 +12,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    networks:
+      - internal
 
   account-db:
     image: postgres:16-alpine
@@ -23,6 +25,8 @@ services:
       - "5432:5432"
     volumes:
       - account-db-data:/var/lib/postgresql/data
+    networks:
+      - internal
 
   transfer-db:
     image: postgres:16-alpine
@@ -34,6 +38,8 @@ services:
       - "5433:5432"
     volumes:
       - transfer-db-data:/var/lib/postgresql/data
+    networks:
+      - internal
 
   history-db:
     image: postgres:16-alpine
@@ -45,12 +51,16 @@ services:
       - "5434:5432"
     volumes:
       - history-db-data:/var/lib/postgresql/data
+    networks:
+      - internal
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.7.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - internal
 
   kafka:
     image: confluentinc/cp-kafka:7.7.0
@@ -65,6 +75,8 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - internal
 
   prometheus:
     image: prom/prometheus:v2.53.0
@@ -85,6 +97,8 @@ services:
           --storage.tsdb.path=/prometheus \
           --web.console.libraries=/usr/share/prometheus/console_libraries \
           --web.console.templates=/usr/share/prometheus/consoles
+    networks:
+      - internal
 
   grafana:
     image: grafana/grafana:11.1.0
@@ -94,6 +108,8 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
     depends_on:
       - prometheus
+    networks:
+      - internal
 
   # --- Services ---
 
@@ -115,6 +131,8 @@ services:
       timeout: 10s
       start_period: 40s
       retries: 3
+    networks:
+      - internal
 
   discovery-server-2:
     build:
@@ -134,6 +152,8 @@ services:
       timeout: 10s
       start_period: 40s
       retries: 3
+    networks:
+      - internal
 
   api-gateway-1:
     build:
@@ -154,12 +174,16 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      GATEWAY_INTERNAL_SECRET: ${INTERNAL_API_SECRET:-change-me-in-production}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       start_period: 40s
       retries: 3
+    networks:
+      - public
+      - internal
 
   api-gateway-2:
     build:
@@ -180,19 +204,21 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       GATEWAY_CORS_ALLOWED_ORIGINS: ${GATEWAY_CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+      GATEWAY_INTERNAL_SECRET: ${INTERNAL_API_SECRET:-change-me-in-production}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       start_period: 40s
       retries: 3
+    networks:
+      - public
+      - internal
 
   account-service:
     build:
       context: .
       dockerfile: account-service/Dockerfile
-    ports:
-      - "8081:8081"
     depends_on:
       discovery-server-1:
         condition: service_healthy
@@ -209,13 +235,13 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-in-production}
+    networks:
+      - internal
 
   transfer-service:
     build:
       context: .
       dockerfile: transfer-service/Dockerfile
-    ports:
-      - "8082:8082"
     depends_on:
       discovery-server-1:
         condition: service_healthy
@@ -233,13 +259,14 @@ services:
       SPRING_DATASOURCE_PASSWORD: transfer_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-in-production}
+    networks:
+      - internal
 
   transaction-history-service:
     build:
       context: .
       dockerfile: transaction-history-service/Dockerfile
-    ports:
-      - "8083:8083"
     depends_on:
       discovery-server-1:
         condition: service_healthy
@@ -255,8 +282,17 @@ services:
       SPRING_DATASOURCE_PASSWORD: history_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-1:8761/eureka/,http://${EUREKA_USERNAME:-eureka}:${EUREKA_PASSWORD}@discovery-server-2:8761/eureka/
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET:-change-me-in-production}
+    networks:
+      - internal
 
 volumes:
   account-db-data:
   transfer-db-data:
   history-db-data:
+
+networks:
+  public:
+    driver: bridge
+  internal:
+    driver: bridge
