@@ -15,94 +15,96 @@ spring:
       port: ${REDIS_PORT:6379}
   cloud:
     gateway:
-      httpclient:
-        connect-timeout: 2000      # 2 seconds to establish connection
-        response-timeout: 10s      # 10 seconds to receive first response byte
-      discovery:
-        locator:
-          enabled: true
-          lower-case-service-id: true
-      routes:
-        # SECURITY: Block all internal endpoints — must be first route
-        - id: block-internal-endpoints
-          uri: no://op
-          predicates:
-            - Path=/*/internal/**,/internal/**
-          filters:
-            - SetStatus=404
-          order: -100
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 2000      # 2 seconds to establish connection
+            response-timeout: 10s      # 10 seconds to receive first response byte
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+          routes:
+            # SECURITY: Block all internal endpoints — must be first route
+            - id: block-internal-endpoints
+              uri: no://op
+              predicates:
+                - Path=/*/internal/**,/internal/**
+              filters:
+                - SetStatus=404
+              order: -100
 
-        - id: account-service-auth
-          uri: lb://account-service
-          predicates:
-            - Path=/api/auth/**
-          filters:
-            - StripPrefix=1
-            - name: RequestRateLimiter
-              args:
-                # 10 requests/minute per IP — brute-force protection on auth endpoints
-                redis-rate-limiter.replenishRate: 10
-                redis-rate-limiter.burstCapacity: 10
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@ipKeyResolver}"
-            - name: CircuitBreaker
-              args:
-                name: account-service-auth-cb
-                fallbackUri: forward:/fallback/service-unavailable
+            - id: account-service-auth
+              uri: lb://account-service
+              predicates:
+                - Path=/api/auth/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    # 10 requests/minute per IP — brute-force protection on auth endpoints
+                    redis-rate-limiter.replenishRate: 10
+                    redis-rate-limiter.burstCapacity: 10
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@ipKeyResolver}"
+                - name: CircuitBreaker
+                  args:
+                    name: account-service-auth-cb
+                    fallbackUri: forward:/fallback/service-unavailable
 
-        - id: account-service
-          uri: lb://account-service
-          predicates:
-            - Path=/api/accounts/**
-          filters:
-            - StripPrefix=1
-            - name: RequestRateLimiter
-              args:
-                # 100 requests/minute per authenticated user
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 100
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
-            - name: CircuitBreaker
-              args:
-                name: account-service-cb
-                fallbackUri: forward:/fallback/service-unavailable
+            - id: account-service
+              uri: lb://account-service
+              predicates:
+                - Path=/api/accounts/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    # 100 requests/minute per authenticated user
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 100
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
+                - name: CircuitBreaker
+                  args:
+                    name: account-service-cb
+                    fallbackUri: forward:/fallback/service-unavailable
 
-        - id: transfer-service
-          uri: lb://transfer-service
-          predicates:
-            - Path=/api/transfers/**
-          filters:
-            - StripPrefix=1
-            - name: RequestRateLimiter
-              args:
-                # 100 requests/minute per authenticated user
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 100
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
-            - name: CircuitBreaker
-              args:
-                name: transfer-service-cb
-                fallbackUri: forward:/fallback/service-unavailable
+            - id: transfer-service
+              uri: lb://transfer-service
+              predicates:
+                - Path=/api/transfers/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    # 100 requests/minute per authenticated user
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 100
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
+                - name: CircuitBreaker
+                  args:
+                    name: transfer-service-cb
+                    fallbackUri: forward:/fallback/service-unavailable
 
-        - id: transaction-history-service
-          uri: lb://transaction-history-service
-          predicates:
-            - Path=/api/transactions/**
-          filters:
-            - StripPrefix=1
-            - name: RequestRateLimiter
-              args:
-                # 100 requests/minute per authenticated user
-                redis-rate-limiter.replenishRate: 100
-                redis-rate-limiter.burstCapacity: 100
-                redis-rate-limiter.requestedTokens: 1
-                key-resolver: "#{@userKeyResolver}"
-            - name: CircuitBreaker
-              args:
-                name: transaction-history-service-cb
-                fallbackUri: forward:/fallback/service-unavailable
+            - id: transaction-history-service
+              uri: lb://transaction-history-service
+              predicates:
+                - Path=/api/transactions/**
+              filters:
+                - StripPrefix=1
+                - name: RequestRateLimiter
+                  args:
+                    # 100 requests/minute per authenticated user
+                    redis-rate-limiter.replenishRate: 100
+                    redis-rate-limiter.burstCapacity: 100
+                    redis-rate-limiter.requestedTokens: 1
+                    key-resolver: "#{@userKeyResolver}"
+                - name: CircuitBreaker
+                  args:
+                    name: transaction-history-service-cb
+                    fallbackUri: forward:/fallback/service-unavailable
 
 jwt:
   secret: ${JWT_SECRET:fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}
