@@ -36,6 +36,10 @@ public abstract class BaseEntity {
         this.createdAt = createdAt;
     }
 
+    protected void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
     protected void markUpdated() {
         this.updatedAt = Instant.now();
     }

@@ -115,30 +115,23 @@ class ReconstitutionBugReproduceTest {
     }
 
     /**
-     * FAILS NOW: because toDomain() resets balance to 0, calling debit() on a loaded
-     * account always throws INSUFFICIENT_BALANCE even when the account has enough funds.
+     * FIXED: toDomain() now calls reconstitute() which restores balance=100,000.
+     * Calling debit(50,000) on an account with 100,000 VND succeeds without throwing.
      * <p>
-     * This is the most critical consequence of the bug — transfers always fail.
-     * <p>
-     * PASSES AFTER FIX: debit() works correctly with the restored balance.
+     * This was the most critical consequence of the bug — transfers always failed.
+     * After the fix, debit() works correctly with the restored balance.
      */
     @Test
-    @DisplayName("REPRODUCE: debit() always throws INSUFFICIENT_BALANCE on accounts loaded from DB")
-    void toDomain_balanceResetToZero_causesDebitToAlwaysFail() {
+    @DisplayName("FIXED: debit() succeeds on accounts loaded from DB when balance is sufficient")
+    void toDomain_balanceRestored_debitSucceeds() {
         // Arrange — account has 100,000 VND in DB, trying to debit 50,000 VND
         BankAccountJpaEntity entity = buildEntityWithBalance(100_000L);
         BankAccount account = entity.toDomain();
 
-        // Act & Assert — FAILS with current code: balance is 0, so debit throws
-        // After fix: balance is 100,000, so debit succeeds
-        assertThatThrownBy(() -> account.debit(Money.of(50_000L), "transfer-123"))
-                .as("With the bug: balance=0 causes INSUFFICIENT_BALANCE even though DB has 100,000 VND. " +
-                        "After fix: this should NOT throw — debit should succeed.")
-                .hasMessageContaining("Insufficient balance");
-        // NOTE: This test asserts the BUGGY behavior.
-        // After the fix, this test should be INVERTED:
-        //   assertThatNoException().isThrownBy(() -> account.debit(...))
-        // But for reproduce purposes, we assert the bug IS present.
+        // Act & Assert — After fix: balance is 100,000, so debit succeeds without throwing
+        org.assertj.core.api.Assertions.assertThatNoException()
+                .as("After fix: balance=100,000 is restored from DB, so debit(50,000) should succeed.")
+                .isThrownBy(() -> account.debit(Money.of(50_000L), "transfer-123"));
     }
 
     // -----------------------------------------------------------------------
