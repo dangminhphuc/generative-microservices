@@ -1,10 +1,12 @@
 package com.fintech.discovery;
 
+import com.netflix.eureka.EurekaServerContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.cloud.netflix.eureka.EurekaClientConfigBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
@@ -18,6 +20,12 @@ class DiscoveryServerApplicationTests {
     @Autowired
     private TestRestTemplate restTemplate;
 
+    @Autowired
+    private EurekaServerContext eurekaServerContext;
+
+    @Autowired
+    private EurekaClientConfigBean eurekaClientConfig;
+
     @Value("${app.security.username}")
     private String username;
 
@@ -27,6 +35,18 @@ class DiscoveryServerApplicationTests {
     @Test
     void contextLoads() {
         // Verifies Eureka Server starts successfully in test context
+    }
+
+    @Test
+    void contextLoadsWithStandaloneProfile() {
+        // Dev profile runs as standalone: no self-registration, no registry fetching
+        assertThat(eurekaClientConfig.shouldRegisterWithEureka()).isFalse();
+        assertThat(eurekaClientConfig.shouldFetchRegistry()).isFalse();
+    }
+
+    @Test
+    void eurekaServerContextIsAvailable() {
+        assertThat(eurekaServerContext).isNotNull();
     }
 
     @Test
