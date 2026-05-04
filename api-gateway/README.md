@@ -1,305 +1,296 @@
-# api-gateway
+# API Gateway
 
-The `api-gateway` is the single entry point for all external traffic in the fintech platform. It handles request routing to downstream microservices, JWT authentication, and CORS policy enforcement. No client ever talks directly to a backend service — every request goes through this gateway.
+The API Gateway is the single entry point for all client traffic in the Fintech Platform. It sits in front of the downstream microservices and handles:
 
-## Table of Contents
-
-- [Service Description](#service-description)
-- [Tech Stack](#tech-stack)
-- [Configuration Profiles](#configuration-profiles)
-- [Environment Variables](#environment-variables)
-- [JWT Authentication Flow](#jwt-authentication-flow)
-- [Public vs Protected Paths](#public-vs-protected-paths)
-- [CORS Configuration](#cors-configuration)
-- [Actuator Endpoints](#actuator-endpoints)
-- [Running Locally and with Docker](#running-locally-and-with-docker)
-
----
-
-## Service Description
-
-The api-gateway sits in front of all backend services and is responsible for:
-
-- **Routing** — forwards requests to `account-service`, `transfer-service`, and `transaction-history-service` via Eureka service discovery (load-balanced with `lb://`)
-- **JWT validation** — inspects the `Authorization: Bearer <token>` header on every protected request and rejects invalid or missing tokens with `401 Unauthorized`
-- **Header propagation** — after a successful JWT validation, injects `X-User-Id` and `X-User-Email` headers into the forwarded request so downstream services don't need to re-parse the token
-- **Internal endpoint blocking** — a high-priority route (`order: -100`) blocks all paths matching `/*/internal/**` and `/internal/**` with a `404` response, preventing exposure of internal-only controllers
-- **CORS** — applies a global CORS policy configured via environment variable, allowing the frontend origin(s) to make cross-origin requests
+- **Request routing** — path-based routing to `account-service`, `transfer-service`, and `transaction-history-service` via Spring Cloud Gateway and Eureka service discovery.
+- **JWT authentication** — validates Bearer tokens on protected endpoints and forwards `X-User-Id` / `X-User-Email` headers to downstream services.
+- **Rate limiting** — Redis-backed token-bucket rate limiting (10 req/min per IP on auth routes, 100 req/min per user on protected routes).
+- **CORS** — configurable allowed origins for browser-based clients.
+- **Circuit breaking** — Resilience4j circuit breakers with a fallback controller returning `503 Service Unavailable`.
+- **Internal endpoint blocking** — prevents external access to `/*/internal/**` paths.
+- **Gateway secret injection** — attaches an `X-Gateway-Secret` header so downstream services can verify requests originated from the gateway.
 
 ---
 
 ## Tech Stack
 
-| Component | Library / Version |
+| Component | Version |
 |---|---|
-| Runtime | Java 21 (eclipse-temurin:21) |
-| Framework | Spring Boot 3.x |
-| Gateway | Spring Cloud Gateway (reactive, WebFlux-based) |
-| Service discovery | Spring Cloud Netflix Eureka Client |
-| JWT | jjwt-api / jjwt-impl / jjwt-jackson |
-| Observability | Spring Boot Actuator, Micrometer + Prometheus |
-| Build | Maven (spring-boot-maven-plugin) |
+| Java | 21 |
+| Spring Boot | 3.5.14 |
+| Spring Cloud | 2025.0.0 |
+| Spring Cloud Gateway | (managed by Spring Cloud BOM) |
+| Spring Cloud Netflix Eureka Client | (managed by Spring Cloud BOM) |
+| Resilience4j (Circuit Breaker) | (managed by Spring Cloud BOM) |
+| Spring Boot Actuator | (managed by Spring Boot parent) |
+| Spring Data Redis Reactive | (managed by Spring Boot parent) |
+| JJWT (io.jsonwebtoken) | 0.12.6 |
+| Build tool | Maven (multi-module, parent `fintech-platform`) |
+| Container runtime | Eclipse Temurin 21 (Alpine) |
 
 ---
 
 ## Configuration Profiles
 
-The service ships with two YAML configuration files.
+The gateway uses Spring profiles to separate environment-specific settings. The default profile is `dev`.
 
-### `application.yml` (default / dev profile)
+### `dev` (default)
 
-Used when running locally with `mvn spring-boot:run` or without an explicit `SPRING_PROFILES_ACTIVE`.
+Activated when no profile is set, or explicitly with `SPRING_PROFILES_ACTIVE=dev`.
 
-Key settings:
+| Setting | Value |
+|---|---|
+| Eureka hostname | `localhost` |
+| Eureka URL | `http://eureka:password@localhost:8761/eureka/` |
+| Redis | `localhost:6379` |
+| CORS origins | `http://localhost:3000` |
+| JWT secret | Built-in development default (see Environment Variables) |
+| Gateway internal secret | `dev-gateway-secret-for-local-only` |
 
-```yaml
-server:
-  port: 8080
+### `docker`
 
-jwt:
-  secret: ${JWT_SECRET:fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}
+Activated with `SPRING_PROFILES_ACTIVE=docker`. Used inside `docker-compose`.
 
-gateway:
-  cors:
-    allowed-origins: http://localhost:3000
+| Setting | Value |
+|---|---|
+| Eureka hostname | `${EUREKA_INSTANCE_HOSTNAME:api-gateway}` |
+| Eureka URL | `${EUREKA_DEFAULT_ZONE:http://eureka:password@discovery-server:8761/eureka/}` |
+| Redis | `${REDIS_HOST}:${REDIS_PORT}` (set by docker-compose) |
+| CORS origins | `${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000}` |
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics,prometheus
-```
+### `prod`
 
-Eureka is not explicitly configured here — the default Spring Cloud Eureka client settings apply (`http://localhost:8761/eureka/`).
+Activated with `SPRING_PROFILES_ACTIVE=prod`. All secrets are **required** — the application will fail to start if they are missing.
 
-### `application-docker.yml` (docker profile)
-
-Activated by setting `SPRING_PROFILES_ACTIVE=docker`. Overrides Eureka and CORS settings for containerised deployments.
-
-```yaml
-eureka:
-  instance:
-    hostname: ${EUREKA_INSTANCE_HOSTNAME:api-gateway}
-    prefer-ip-address: false
-  client:
-    service-url:
-      defaultZone: ${EUREKA_DEFAULT_ZONE:http://eureka:password@discovery-server:8761/eureka/}
-
-gateway:
-  cors:
-    allowed-origins: ${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000}
-```
-
-**Differences between profiles:**
-
-| Setting | dev (application.yml) | docker (application-docker.yml) |
-|---|---|---|
-| Eureka URL | `http://localhost:8761/eureka/` (default) | `${EUREKA_DEFAULT_ZONE}` — points to named Docker service |
-| Eureka hostname | IP-based (default) | `${EUREKA_INSTANCE_HOSTNAME:api-gateway}` |
-| CORS origins | `http://localhost:3000` (hardcoded in yml) | `${GATEWAY_CORS_ALLOWED_ORIGINS:http://localhost:3000}` |
+| Setting | Value |
+|---|---|
+| Eureka hostname | `${EUREKA_INSTANCE_HOSTNAME:api-gateway}` |
+| Eureka URL | `${EUREKA_DEFAULT_ZONE}` (**required**, no default) |
+| CORS origins | `${GATEWAY_CORS_ALLOWED_ORIGINS}` (**required**, no default) |
+| JWT secret | `${JWT_SECRET}` (**required**, no default — enforced by `JwtSecretValidator`) |
 
 ---
 
 ## Environment Variables
 
-| Variable | Profile | Default | Description |
+| Variable | Description | Default | Required in prod? |
 |---|---|---|---|
-| `JWT_SECRET` | all | `fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256` | HMAC-SHA256 signing key. **Must be at least 256 bits (32 chars).** Change in production. |
-| `GATEWAY_CORS_ALLOWED_ORIGINS` | docker | `http://localhost:3000` | Comma-separated list of allowed CORS origins, e.g. `https://app.example.com,https://admin.example.com` |
-| `EUREKA_DEFAULT_ZONE` | docker | `http://eureka:password@discovery-server:8761/eureka/` | Eureka server URL(s). Supports comma-separated list for HA. |
-| `EUREKA_INSTANCE_HOSTNAME` | docker | `api-gateway` | Hostname the gateway registers under in Eureka. |
-| `SPRING_PROFILES_ACTIVE` | docker | _(none)_ | Set to `docker` to activate the docker profile. |
-
-> **Security note**: Never commit a real `JWT_SECRET` to source control. Inject it via a secrets manager or environment variable at runtime.
+| `SPRING_PROFILES_ACTIVE` | Active Spring profile (`dev`, `docker`, `prod`) | `dev` | Yes |
+| `JWT_SECRET` | HMAC-SHA256 signing key for JWT validation (≥ 256 bits) | `fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256` | **Yes** (no default) |
+| `REDIS_HOST` | Redis hostname for rate limiter | `localhost` | Yes |
+| `REDIS_PORT` | Redis port | `6379` | Yes |
+| `EUREKA_INSTANCE_HOSTNAME` | Hostname this instance registers with in Eureka | `api-gateway` | Yes |
+| `EUREKA_DEFAULT_ZONE` | Eureka service URL(s), comma-separated | `http://eureka:password@discovery-server:8761/eureka/` | **Yes** (no default) |
+| `EUREKA_USERNAME` | Eureka Basic Auth username (used in docker-compose) | `eureka` | Yes |
+| `EUREKA_PASSWORD` | Eureka Basic Auth password (used in docker-compose) | — | **Yes** (no default) |
+| `GATEWAY_CORS_ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins | `http://localhost:3000` | **Yes** (no default) |
+| `GATEWAY_INTERNAL_SECRET` | Shared secret injected as `X-Gateway-Secret` header | `dev-gateway-secret-for-local-only` | Yes |
 
 ---
 
 ## JWT Authentication Flow
 
-The `JwtAuthenticationFilter` is a `GlobalFilter` with `order = -1`, meaning it runs before route filters but after the internal-blocking route (`order = -100`).
+The `JwtAuthenticationFilter` is a `GlobalFilter` (order `-1`) that runs on every request:
 
 ```
-Client
-  │
-  │  HTTP request
-  ▼
-api-gateway (port 8080)
-  │
-  ├─ [1] Check path against PUBLIC_PATHS list
-  │       If public → skip JWT, forward immediately
-  │
-  ├─ [2] Read Authorization header
-  │       If missing or not "Bearer <token>" → 401 Unauthorized
-  │
-  ├─ [3] Parse and verify JWT signature
-  │       Uses HMAC-SHA256 with JWT_SECRET
-  │       If invalid/expired → log WARN, return 401 Unauthorized
-  │       If unexpected error → log ERROR, return 401 Unauthorized
-  │
-  ├─ [4] Extract claims from token payload
-  │       subject  → X-User-Id header
-  │       "email"  → X-User-Email header
-  │
-  └─ [5] Forward mutated request to downstream service
-              (downstream reads X-User-Id / X-User-Email — no JWT re-parsing needed)
+Client request
+      │
+      ▼
+┌─────────────────────────┐
+│  Is path public?        │──── Yes ──▶ Forward to downstream (no auth)
+│  (see Public Paths)     │
+└─────────┬───────────────┘
+          │ No
+          ▼
+┌─────────────────────────┐
+│  Authorization header   │──── Missing/invalid ──▶ 401 Unauthorized
+│  present with "Bearer"? │
+└─────────┬───────────────┘
+          │ Yes
+          ▼
+┌─────────────────────────┐
+│  Parse & verify JWT     │──── JwtException ──▶ log.warn + 401 Unauthorized
+│  with HMAC-SHA256 key   │──── Other Exception ──▶ log.error + 401 Unauthorized
+└─────────┬───────────────┘
+          │ Valid
+          ▼
+┌─────────────────────────┐
+│  Extract claims:        │
+│  • subject → X-User-Id  │
+│  • email  → X-User-Email│
+└─────────┬───────────────┘
+          │
+          ▼
+   Forward to downstream
+   (with injected headers)
 ```
 
-**Token format**: Standard JWT signed with HS256. The payload must contain:
-- `sub` — user ID (forwarded as `X-User-Id`)
-- `email` — user email (forwarded as `X-User-Email`)
-
-Tokens are issued by `account-service` via the `/api/auth/login` and `/api/auth/refresh` endpoints.
+After JWT validation, the `GatewaySecretFilter` (order `0`) appends the `X-Gateway-Secret` header so downstream services can verify the request came through the gateway.
 
 ---
 
 ## Public vs Protected Paths
 
-### Public paths (no JWT required)
+### Public paths (bypass JWT authentication)
 
-These paths bypass the `JwtAuthenticationFilter` entirely:
+These paths are defined in `JwtAuthenticationFilter.PUBLIC_PATHS`:
 
-| Path prefix | Routed to | Purpose |
+| Path prefix | Description |
+|---|---|
+| `/api/auth/register` | User registration |
+| `/api/auth/login` | User login |
+| `/api/auth/refresh` | Token refresh |
+| `/actuator` | Health, metrics, and info endpoints |
+
+### Blocked paths
+
+| Path pattern | Behavior |
+|---|---|
+| `/*/internal/**` | Returns `404 Not Found` (blocked by gateway route, order `-100`) |
+| `/internal/**` | Returns `404 Not Found` (blocked by gateway route, order `-100`) |
+
+### Protected paths (require valid JWT)
+
+All other paths require a valid `Authorization: Bearer <token>` header. The main routed services are:
+
+| Path prefix | Downstream service | Rate limit |
 |---|---|---|
-| `/api/auth/register` | account-service | New user registration |
-| `/api/auth/login` | account-service | Login — returns JWT access + refresh tokens |
-| `/api/auth/refresh` | account-service | Exchange refresh token for new access token |
-| `/actuator` | api-gateway itself | Health checks and metrics (see Actuator section) |
+| `/api/auth/**` | `account-service` | 10 req/min per IP |
+| `/api/accounts/**` | `account-service` | 100 req/min per user |
+| `/api/transfers/**` | `transfer-service` | 100 req/min per user |
+| `/api/transactions/**` | `transaction-history-service` | 100 req/min per user |
 
-### Blocked paths (always 404)
+> **Note:** `/api/auth/**` routes are public for JWT purposes but still rate-limited at 10 req/min per IP to prevent brute-force attacks.
 
-These paths are blocked at the gateway before any filter or route runs:
-
-| Path pattern | Status | Reason |
-|---|---|---|
-| `/*/internal/**` | 404 | Prevents access to internal service controllers |
-| `/internal/**` | 404 | Prevents access to internal service controllers |
-
-### Protected paths (JWT required)
-
-All other paths require a valid `Authorization: Bearer <token>` header:
-
-| Path prefix | Routed to | Strip prefix |
-|---|---|---|
-| `/api/accounts/**` | account-service | `/api` stripped |
-| `/api/transfers/**` | transfer-service | `/api` stripped |
-| `/api/transactions/**` | transaction-history-service | `/api` stripped |
+All routes use `StripPrefix=1` — the `/api` segment is removed before forwarding to the downstream service.
 
 ---
 
 ## CORS Configuration
 
-CORS is handled by a `CorsWebFilter` bean in `SecurityConfig`. The allowed origins are read from the `gateway.cors.allowed-origins` property.
+CORS is configured in `SecurityConfig` via a `CorsWebFilter` bean.
 
-**Allowed methods**: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`
+**Default settings:**
 
-**Allowed headers**: `Authorization`, `Content-Type`, `X-Requested-With`
+| Setting | Value |
+|---|---|
+| Allowed origins | `http://localhost:3000` (configurable via `GATEWAY_CORS_ALLOWED_ORIGINS`) |
+| Allowed methods | `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS` |
+| Allowed headers | `Authorization`, `Content-Type`, `X-Requested-With` |
+| Allow credentials | `true` |
+| Max age | `3600` seconds (1 hour) |
 
-**Credentials**: allowed (`allowCredentials = true`)
+**Overriding origins:**
 
-**Max age**: 3600 seconds (1 hour preflight cache)
-
-### Setting allowed origins
-
-**Local dev** — edit `application.yml`:
-
-```yaml
-gateway:
-  cors:
-    allowed-origins: http://localhost:3000
-```
-
-**Docker / production** — set the `GATEWAY_CORS_ALLOWED_ORIGINS` environment variable. Use a comma-separated list for multiple origins:
+Set the `GATEWAY_CORS_ALLOWED_ORIGINS` environment variable to a comma-separated list:
 
 ```bash
-GATEWAY_CORS_ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
+# Single origin
+export GATEWAY_CORS_ALLOWED_ORIGINS=https://app.example.com
+
+# Multiple origins
+export GATEWAY_CORS_ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
 ```
 
-In `docker-compose.yml`:
+In `docker-compose.yml`, set it in the service environment:
 
 ```yaml
-api-gateway:
-  environment:
-    GATEWAY_CORS_ALLOWED_ORIGINS: "https://app.example.com,https://admin.example.com"
+environment:
+  GATEWAY_CORS_ALLOWED_ORIGINS: https://app.example.com,https://admin.example.com
 ```
-
-If the variable is not set, the default `http://localhost:3000` is used.
 
 ---
 
 ## Actuator Endpoints
 
-The following actuator endpoints are exposed at `/actuator/*`:
+The following actuator endpoints are exposed:
 
-| Endpoint | URL | Description |
-|---|---|---|
-| Health | `GET /actuator/health` | Returns `{"status":"UP"}` when the service is healthy. Used by Docker health checks. |
-| Info | `GET /actuator/info` | Application metadata (name, version). |
-| Metrics | `GET /actuator/metrics` | Lists all available Micrometer metric names. |
-| Prometheus | `GET /actuator/prometheus` | Prometheus-format metrics scraped by the `prometheus` service in docker-compose. |
+| Endpoint | Description |
+|---|---|
+| `/actuator/health` | Application health status |
+| `/actuator/info` | Application info |
+| `/actuator/metrics` | Micrometer metrics |
+| `/actuator/prometheus` | Prometheus-format metrics scrape endpoint |
 
-All actuator paths are public (no JWT required). The `/actuator/health` endpoint is used by Docker Compose `healthcheck` configurations in dependent services.
+All actuator paths are public (no JWT required). Metrics are tagged with `application: api-gateway`.
 
 ---
 
-## Running Locally and with Docker
+## Circuit Breakers
+
+Each downstream route has a Resilience4j circuit breaker. When a circuit opens, requests are forwarded to the `FallbackController` which returns:
+
+```json
+{
+  "error": "Service temporarily unavailable",
+  "code": "SERVICE_UNAVAILABLE"
+}
+```
+
+**Circuit breaker configuration** (same for all instances):
+
+| Parameter | Value |
+|---|---|
+| Sliding window size | 10 |
+| Failure rate threshold | 50% |
+| Wait duration in open state | 30 seconds |
+| Permitted calls in half-open state | 3 |
+
+Circuit breaker instances: `account-service-auth-cb`, `account-service-cb`, `transfer-service-cb`, `transaction-history-service-cb`.
+
+---
+
+## How to Run
 
 ### Prerequisites
 
-- Java 21+
+- Java 21
 - Maven 3.9+
-- A running Eureka server at `http://localhost:8761` (or set `EUREKA_DEFAULT_ZONE`)
+- Redis (for rate limiting)
+- A running Eureka discovery server (see `discovery-server/`)
 
-### Run locally with Maven
+### Run locally (dev profile)
 
 ```bash
-# From the repo root
-mvn spring-boot:run -pl api-gateway
+# From the project root — build the common module first
+mvn -pl common install -DskipTests
+
+# Start the gateway
+mvn -pl api-gateway spring-boot:run
 ```
 
-The gateway starts on port `8080`. It connects to Eureka at `http://localhost:8761/eureka/` by default.
+The gateway starts on `http://localhost:8080` with the `dev` profile. It expects:
+- Eureka at `http://localhost:8761`
+- Redis at `localhost:6379`
 
-To override the JWT secret:
+### Run with Docker Compose
 
 ```bash
-JWT_SECRET=my-super-secret-key-at-least-32-chars mvn spring-boot:run -pl api-gateway
+# Create a .env file with required secrets
+echo "EUREKA_PASSWORD=your-eureka-password" > .env
+
+# Build and start all services
+docker compose up --build
 ```
 
-### Build and run with Docker
+The gateway is available at:
+- `http://localhost:8080` (api-gateway-1)
+- `http://localhost:8090` (api-gateway-2)
 
-The Dockerfile uses a multi-stage build. It must be built from the **repo root** (not from inside `api-gateway/`) because it copies the `common` module:
+### Build the Docker image manually
 
 ```bash
-# Build the image from the repo root
-docker build -f api-gateway/Dockerfile -t api-gateway:local .
-
-# Run the container
-docker run -p 8080:8080 \
-  -e SPRING_PROFILES_ACTIVE=docker \
-  -e JWT_SECRET=my-super-secret-key-at-least-32-chars \
-  -e EUREKA_DEFAULT_ZONE=http://eureka:password@localhost:8761/eureka/ \
-  -e GATEWAY_CORS_ALLOWED_ORIGINS=http://localhost:3000 \
-  api-gateway:local
+# From the project root (build context needs parent pom + common module)
+docker build -f api-gateway/Dockerfile -t api-gateway .
 ```
 
-### Run the full stack with Docker Compose
+The Dockerfile uses a multi-stage build:
+1. **Build stage** — `eclipse-temurin:21-jdk-alpine` with Maven, builds `common` and `api-gateway` modules.
+2. **Runtime stage** — `eclipse-temurin:21-jre-alpine`, copies the fat JAR, exposes port `8080`.
+
+### Verify the gateway is running
 
 ```bash
-# From the repo root — required env vars
-export EUREKA_PASSWORD=yourpassword
-
-docker-compose up --build
-```
-
-The api-gateway will be available at `http://localhost:8080`. It waits for both `discovery-server-1` and `discovery-server-2` to pass their health checks before starting.
-
-To bring down the stack:
-
-```bash
-docker-compose down
-```
-
-To rebuild only the api-gateway image:
-
-```bash
-docker-compose up --build api-gateway
+curl http://localhost:8080/actuator/health
+# Expected: {"status":"UP"}
 ```
