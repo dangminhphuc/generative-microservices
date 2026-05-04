@@ -14,6 +14,19 @@ RUN apk add --no-cache maven && \
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+
+# Security: non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 COPY --from=build /app/account-service/target/*.jar app.jar
+
+# JVM container-aware memory settings
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseContainerSupport"
+
+# Health check using wget (available in alpine)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD wget -q --spider http://localhost:8081/actuator/health || exit 1
+
+USER appuser
 EXPOSE 8081
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

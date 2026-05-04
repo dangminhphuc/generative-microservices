@@ -1,0 +1,7 @@
+# Production profile — all secrets MUST be provided via environment variables.
+# No default fallbacks. Service will fail to start if any secret is missing.
+jwt:
+  secret: ${JWT_SECRET}
+internal:
+  api:
+    secret: ${INTERNAL_API_SECRET}

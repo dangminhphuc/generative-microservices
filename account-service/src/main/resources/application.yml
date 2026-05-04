@@ -44,6 +44,7 @@ eureka:
   instance:
     prefer-ip-address: true
 
+# DEV/TEST ONLY — override via application-prod.yml in production
 jwt:
   secret: ${JWT_SECRET:fintech-platform-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256}
   access-token-expiry: 900000
@@ -51,6 +52,7 @@ jwt:
 
 # Secret used to authenticate service-to-service calls to /internal/** endpoints.
 # Must be set via INTERNAL_API_SECRET environment variable on all environments.
+# DEV/TEST ONLY — override via application-prod.yml in production
 internal:
   api:
     secret: ${INTERNAL_API_SECRET:dev-internal-secret-for-local-only}
