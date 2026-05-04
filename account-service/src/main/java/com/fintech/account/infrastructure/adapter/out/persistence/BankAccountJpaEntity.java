@@ -59,12 +59,16 @@ public class BankAccountJpaEntity {
     }
 
     public BankAccount toDomain() {
-        // Reconstitute via factory — simplified for now
-        BankAccount account = BankAccount.create(
-                AccountNumber.of(accountNumber), userId);
-        // Note: In production, use a proper reconstitution method
-        // that sets all fields including balance, version, timestamps
-        return account;
+        return BankAccount.reconstitute(
+                id,
+                AccountNumber.of(accountNumber),
+                userId,
+                Money.of(BigDecimal.valueOf(balance), currency),
+                status,
+                version,
+                createdAt,
+                updatedAt
+        );
     }
 
     // Getters for JPA queries
